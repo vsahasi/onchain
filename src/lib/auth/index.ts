@@ -1,35 +1,40 @@
-import { createHash, randomBytes } from "crypto";
-import jwt from "jsonwebtoken";
+import { SignJWT, jwtVerify } from "jose";
+import crypto from "crypto";
 
-const JWT_SECRET = process.env.JWT_SECRET!;
+const JWT_SECRET = new TextEncoder().encode(
+  process.env.JWT_SECRET || "change-me-to-a-random-secret"
+);
 
-export interface JWTPayload {
-  sub: string; // wallet address
-  userId: string;
+export async function createSessionToken(walletAddress: string): Promise<string> {
+  return new SignJWT({ wallet: walletAddress })
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .setExpirationTime("7d")
+    .sign(JWT_SECRET);
 }
 
-export function signJWT(payload: JWTPayload): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: "7d" });
+export async function verifySessionToken(
+  token: string
+): Promise<{ wallet: string } | null> {
+  try {
+    const { payload } = await jwtVerify(token, JWT_SECRET);
+    return { wallet: payload.wallet as string };
+  } catch {
+    return null;
+  }
 }
 
-export function verifyJWT(token: string): JWTPayload {
-  return jwt.verify(token, JWT_SECRET) as JWTPayload;
+export function generateApiKey(): { key: string; hash: string; prefix: string } {
+  const key = `infx_${crypto.randomBytes(32).toString("hex")}`;
+  const hash = crypto.createHash("sha256").update(key).digest("hex");
+  const prefix = key.slice(0, 12);
+  return { key, hash, prefix };
 }
 
-/** Generate a raw API key (shown to user once) and its SHA-256 hash for storage */
-export function generateApiKey(): { raw: string; hash: string; prefix: string } {
-  const raw = `infx_${randomBytes(32).toString("hex")}`;
-  const hash = createHash("sha256").update(raw).digest("hex");
-  const prefix = raw.slice(0, 12);
-  return { raw, hash, prefix };
+export function hashApiKey(key: string): string {
+  return crypto.createHash("sha256").update(key).digest("hex");
 }
 
-/** Hash an incoming API key for DB lookup */
-export function hashApiKey(raw: string): string {
-  return createHash("sha256").update(raw).digest("hex");
-}
-
-/** Generate a nonce challenge for wallet signature auth */
-export function generateNonce(): string {
-  return `Sign in to INFX Marketplace: ${randomBytes(16).toString("hex")}`;
+export function generateChallenge(): string {
+  return crypto.randomBytes(32).toString("hex");
 }

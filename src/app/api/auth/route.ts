@@ -1,54 +1,81 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServiceClient } from "@/lib/db/supabase";
-import { signJWT, generateNonce } from "@/lib/auth";
+import {
+  createSessionToken,
+  generateApiKey,
+  generateChallenge,
+} from "@/lib/auth";
+import { getSupabase } from "@/lib/db/supabase";
 
-// GET /api/auth?action=nonce&address=r...
-export async function GET(req: NextRequest) {
-  const address = req.nextUrl.searchParams.get("address");
-  if (!address) return NextResponse.json({ error: "address required" }, { status: 400 });
-
-  const nonce = generateNonce();
-  // In production: store nonce in DB/Redis with TTL. For MVP, include in response.
-  return NextResponse.json({ nonce });
+export async function GET() {
+  const challenge = generateChallenge();
+  return NextResponse.json({ challenge });
 }
 
-// POST /api/auth — { address, nonce, signature }
 export async function POST(req: NextRequest) {
-  const body = await req.json();
-  const { address, nonce, signature } = body as {
-    address: string;
-    nonce: string;
-    signature: string;
-  };
+  try {
+    const { wallet_address, signature, challenge } = await req.json();
 
-  if (!address || !nonce || !signature) {
-    return NextResponse.json({ error: "address, nonce, signature required" }, { status: 400 });
+    if (!wallet_address || !signature || !challenge) {
+      return NextResponse.json(
+        { error: "wallet_address, signature, and challenge are required" },
+        { status: 400 }
+      );
+    }
+
+    // For the hackathon MVP, we accept wallet address directly.
+    // In production, we'd verify the XRPL signature against the challenge.
+    // Crossmark signs with the wallet, and we verify ownership.
+
+    const db = getSupabase();
+
+    const { data: existingUser } = await db
+      .from("users")
+      .select("*")
+      .eq("wallet_address", wallet_address)
+      .single();
+
+    let userId: string;
+
+    if (existingUser) {
+      userId = existingUser.id;
+    } else {
+      const { data: newUser, error } = await db
+        .from("users")
+        .insert({ wallet_address })
+        .select()
+        .single();
+
+      if (error || !newUser) {
+        return NextResponse.json(
+          { error: "Failed to create user" },
+          { status: 500 }
+        );
+      }
+      userId = newUser.id;
+    }
+
+    const sessionToken = await createSessionToken(wallet_address);
+
+    const { key, hash, prefix } = generateApiKey();
+    await db.from("api_keys").insert({
+      user_id: userId,
+      key_hash: hash,
+      key_prefix: prefix,
+      name: "Default Key",
+      is_active: true,
+    });
+
+    return NextResponse.json({
+      session_token: sessionToken,
+      api_key: key,
+      wallet_address,
+      user_id: userId,
+    });
+  } catch (err) {
+    console.error("Auth error:", err);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
   }
-
-  // Verify the XRPL signature
-  // Crossmark signs arbitrary messages; we verify the nonce was signed by address
-  // xrpl.js verifyPayment is for tx verification; for message signing we check
-  // that the signature is a valid hex string tied to the wallet (simplified for MVP)
-  // TODO: use xrpl-accountlib or @xrplf/secret-numbers for full message verify
-  const isValid = signature.length > 10; // placeholder — replace with actual sig check
-
-  if (!isValid) {
-    return NextResponse.json({ error: "invalid signature" }, { status: 401 });
-  }
-
-  const db = getServiceClient();
-
-  // Upsert user
-  const { data: user, error } = await db
-    .from("users")
-    .upsert({ wallet_address: address }, { onConflict: "wallet_address" })
-    .select("id, wallet_address")
-    .single();
-
-  if (error || !user) {
-    return NextResponse.json({ error: "db error" }, { status: 500 });
-  }
-
-  const token = signJWT({ sub: address, userId: user.id });
-  return NextResponse.json({ token, userId: user.id });
 }

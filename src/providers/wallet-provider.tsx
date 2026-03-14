@@ -1,95 +1,132 @@
 "use client";
 
-import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from "react";
-import sdk from "@crossmarkio/sdk";
+import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
 
-interface WalletContextValue {
+interface WalletState {
   address: string | null;
-  token: string | null;
+  connected: boolean;
+  sessionToken: string | null;
+  apiKey: string | null;
+  userId: string | null;
+}
+
+interface WalletContextType extends WalletState {
   connect: () => Promise<void>;
   disconnect: () => void;
   isConnecting: boolean;
 }
 
-const WalletContext = createContext<WalletContextValue | null>(null);
+const WalletContext = createContext<WalletContextType | null>(null);
 
-export function WalletProvider({ children }: { children: ReactNode }) {
-  const [address, setAddress] = useState<string | null>(null);
-  const [token, setToken] = useState<string | null>(null);
+export function useWallet() {
+  const ctx = useContext(WalletContext);
+  if (!ctx) throw new Error("useWallet must be used within WalletProvider");
+  return ctx;
+}
+
+const STORAGE_KEY = "inferx_wallet";
+
+export function WalletProvider({ children }: { children: React.ReactNode }) {
+  const [state, setState] = useState<WalletState>({
+    address: null,
+    connected: false,
+    sessionToken: null,
+    apiKey: null,
+    userId: null,
+  });
   const [isConnecting, setIsConnecting] = useState(false);
 
-  // Restore session from localStorage on mount
   useEffect(() => {
-    const savedToken = localStorage.getItem("infx_token");
-    const savedAddress = localStorage.getItem("infx_address");
-    if (savedToken && savedAddress) {
-      setToken(savedToken);
-      setAddress(savedAddress);
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        setState(parsed);
+      } catch {}
     }
   }, []);
 
   const connect = useCallback(async () => {
-    // Check Crossmark is installed
-    if (!(window as any).crossmark) {
-      alert("Crossmark wallet not found. Install the Crossmark browser extension first.");
-      return;
-    }
-
     setIsConnecting(true);
     try {
-      // Wrap in a timeout so we never hang forever
-      const withTimeout = <T,>(promise: Promise<T>, ms = 30000): Promise<T> => {
-        const timeout = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("Wallet request timed out")), ms)
+      let walletAddress: string;
+      let signature = "crossmark-signed";
+
+      try {
+        const crossmark = (window as unknown as Record<string, unknown>).xrpl;
+        const crossmarkSdk = (window as unknown as Record<string, { signIn: () => Promise<{ response: { data: { address: string; signature: string } } }> }>).crossmark;
+
+        if (crossmarkSdk) {
+          const resp = await crossmarkSdk.signIn();
+          walletAddress = resp.response.data.address;
+          signature = resp.response.data.signature;
+        } else {
+          throw new Error("Crossmark not available");
+        }
+      } catch {
+        const addr = prompt(
+          "Enter your XRPL wallet address\n(Install Crossmark browser extension for one-click connect)"
         );
-        return Promise.race([promise, timeout]);
-      };
+        if (!addr) {
+          setIsConnecting(false);
+          return;
+        }
+        walletAddress = addr;
+        signature = "manual-entry";
+      }
 
-      const signInResult = await withTimeout(sdk.methods.signInAndWait());
-      const addr = (signInResult as any)?.response?.data?.address;
-      if (!addr) throw new Error("No address returned from wallet");
-
-      // Auth against backend (signIn itself proves ownership for MVP)
-      const nonceRes = await fetch(`/api/auth?address=${addr}`);
-      const { nonce } = await nonceRes.json();
+      const challengeRes = await fetch("/api/auth");
+      const { challenge } = await challengeRes.json();
 
       const authRes = await fetch("/api/auth", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ address: addr, nonce, signature: "signIn:" + addr }),
+        body: JSON.stringify({
+          wallet_address: walletAddress,
+          signature,
+          challenge,
+        }),
       });
 
-      const { token: jwt } = await authRes.json();
-      if (!jwt) throw new Error("Auth failed");
+      if (!authRes.ok) {
+        throw new Error("Authentication failed");
+      }
 
-      setAddress(addr);
-      setToken(jwt);
-      localStorage.setItem("infx_token", jwt);
-      localStorage.setItem("infx_address", addr);
-    } catch (err: any) {
-      console.error("Wallet connect failed:", err);
-      alert(err.message ?? "Wallet connect failed");
+      const authData = await authRes.json();
+
+      const newState: WalletState = {
+        address: authData.wallet_address,
+        connected: true,
+        sessionToken: authData.session_token,
+        apiKey: authData.api_key,
+        userId: authData.user_id,
+      };
+
+      setState(newState);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(newState));
+    } catch (err) {
+      console.error("Wallet connection error:", err);
     } finally {
       setIsConnecting(false);
     }
   }, []);
 
   const disconnect = useCallback(() => {
-    setAddress(null);
-    setToken(null);
-    localStorage.removeItem("infx_token");
-    localStorage.removeItem("infx_address");
+    setState({
+      address: null,
+      connected: false,
+      sessionToken: null,
+      apiKey: null,
+      userId: null,
+    });
+    localStorage.removeItem(STORAGE_KEY);
   }, []);
 
   return (
-    <WalletContext.Provider value={{ address, token, connect, disconnect, isConnecting }}>
+    <WalletContext.Provider
+      value={{ ...state, connect, disconnect, isConnecting }}
+    >
       {children}
     </WalletContext.Provider>
   );
-}
-
-export function useWallet() {
-  const ctx = useContext(WalletContext);
-  if (!ctx) throw new Error("useWallet must be used inside WalletProvider");
-  return ctx;
 }

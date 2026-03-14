@@ -1,104 +1,143 @@
 import { NextRequest, NextResponse } from "next/server";
 import { hashApiKey } from "@/lib/auth";
-import { getServiceClient } from "@/lib/db/supabase";
-import { routeToUpstream, ChatMessage } from "@/lib/gateway/router";
+import { getSupabase } from "@/lib/db/supabase";
+import { routeRequest } from "@/lib/gateway/router";
 import { calculateCreditCost } from "@/lib/gateway/metering";
-import { burnCredits } from "@/lib/xrpl/tokens";
+import { getEffectiveBalance } from "@/lib/xrpl/tokens";
+import { v4 as uuidv4 } from "uuid";
 
-/**
- * POST /api/v1/chat/completions
- * OpenAI-compatible endpoint. Auth via Bearer <api-key>.
- */
-export async function POST(req: NextRequest) {
-  const auth = req.headers.get("authorization");
-  if (!auth?.startsWith("Bearer ")) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
+async function resolveUser(apiKey: string) {
+  const db = getSupabase();
+  const keyHash = hashApiKey(apiKey);
 
-  const rawKey = auth.slice(7);
-  const keyHash = hashApiKey(rawKey);
-
-  const db = getServiceClient();
-
-  // Resolve API key → user
-  const { data: apiKey } = await db
+  const { data: keyRecord } = await db
     .from("api_keys")
-    .select("id, user_id, is_active")
+    .select("*, users(*), seller:source_user_id(id, wallet_address)")
     .eq("key_hash", keyHash)
+    .eq("is_active", true)
     .single();
 
-  if (!apiKey?.is_active) {
-    return NextResponse.json({ error: "invalid or inactive API key" }, { status: 401 });
-  }
+  if (!keyRecord) return null;
 
-  const { data: user } = await db
-    .from("users")
-    .select("id, wallet_address")
-    .eq("id", apiKey.user_id)
-    .single();
+  // The user whose credits get billed: seller if this is a marketplace key, otherwise key owner
+  const billedUser = keyRecord.seller ?? keyRecord.users;
 
-  if (!user) return NextResponse.json({ error: "user not found" }, { status: 404 });
-
-  // Get custodial balance
-  const { data: txns } = await db
-    .from("credit_transactions")
-    .select("tx_type, amount")
-    .eq("user_id", user.id);
-
-  let balance = 0;
-  for (const tx of txns ?? []) {
-    const amt = parseFloat(tx.amount);
-    if (tx.tx_type === "deposit" || tx.tx_type === "purchase") balance += amt;
-    else if (tx.tx_type === "burn" || tx.tx_type === "sale") balance -= amt;
-  }
-
-  if (balance < 1) {
-    return NextResponse.json({ error: "insufficient credits" }, { status: 402 });
-  }
-
-  // Parse request body
-  const body = await req.json();
-  const { model = "gpt-4o-mini", messages } = body as {
-    model: string;
-    messages: ChatMessage[];
+  return {
+    user: keyRecord.users,
+    billedUser,
+    apiKeyId: keyRecord.id,
   };
+}
 
-  if (!messages?.length) {
-    return NextResponse.json({ error: "messages required" }, { status: 400 });
-  }
-
-  // Forward to upstream
-  let result;
+export async function POST(req: NextRequest) {
   try {
-    result = await routeToUpstream(model, messages);
-  } catch (err: any) {
-    return NextResponse.json({ error: `upstream error: ${err.message}` }, { status: 502 });
+    const authHeader = req.headers.get("authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return NextResponse.json(
+        { error: { message: "Missing API key", type: "auth_error" } },
+        { status: 401 }
+      );
+    }
+
+    const apiKey = authHeader.slice(7);
+    const resolved = await resolveUser(apiKey);
+
+    if (!resolved) {
+      return NextResponse.json(
+        { error: { message: "Invalid API key", type: "auth_error" } },
+        { status: 401 }
+      );
+    }
+
+    const { user, billedUser, apiKeyId } = resolved;
+
+    const body = await req.json();
+    const { model = "gpt-4o-mini", messages, temperature, max_tokens } = body;
+
+    if (!messages || !Array.isArray(messages)) {
+      return NextResponse.json(
+        {
+          error: {
+            message: "messages is required and must be an array",
+            type: "invalid_request_error",
+          },
+        },
+        { status: 400 }
+      );
+    }
+
+    const balance = await getEffectiveBalance(billedUser.wallet_address, billedUser.id);
+
+    if (balance.effective_infx <= 0) {
+      return NextResponse.json(
+        {
+          error: {
+            message: "Insufficient IFX credits. The seller's credit pool is empty.",
+            type: "insufficient_credits",
+            balance: balance.effective_infx.toString(),
+          },
+        },
+        { status: 402 }
+      );
+    }
+
+    const result = await routeRequest(model, messages, temperature, max_tokens);
+
+    const creditCost = calculateCreditCost(
+      model,
+      result.usage.prompt_tokens,
+      result.usage.completion_tokens
+    );
+
+    if (creditCost > 0) {
+      try {
+        const db = getSupabase();
+        // Debit the billed user (seller for marketplace keys, buyer for own keys)
+        await db.from("credit_transactions").insert({
+          user_id: billedUser.id,
+          tx_type: "burn",
+          amount: creditCost.toString(),
+          xrpl_tx_hash: "",
+        });
+
+        await db.from("usage_logs").insert({
+          user_id: billedUser.id,
+          api_key_id: apiKeyId,
+          model,
+          prompt_tokens: result.usage.prompt_tokens,
+          completion_tokens: result.usage.completion_tokens,
+          total_tokens: result.usage.total_tokens,
+          credits_used: creditCost,
+          upstream_provider: result.upstreamProvider,
+        });
+      } catch (dbErr) {
+        console.error("Usage logging error:", dbErr);
+      }
+    }
+
+    return NextResponse.json({
+      id: result.id || `chatcmpl-${uuidv4()}`,
+      object: "chat.completion",
+      created: result.created || Math.floor(Date.now() / 1000),
+      model: result.model,
+      choices: result.choices,
+      usage: {
+        prompt_tokens: result.usage.prompt_tokens,
+        completion_tokens: result.usage.completion_tokens,
+        total_tokens: result.usage.total_tokens,
+        credits_used: creditCost,
+      },
+    });
+  } catch (err) {
+    console.error("Gateway error:", err);
+    return NextResponse.json(
+      {
+        error: {
+          message: "Internal server error",
+          type: "server_error",
+        },
+      },
+      { status: 500 }
+    );
   }
-
-  const { prompt_tokens, completion_tokens } = result.usage;
-  const creditsUsed = calculateCreditCost(model, prompt_tokens, completion_tokens);
-
-  // Burn credits (custodial: update DB; XRPL burn runs async)
-  await db.from("credit_transactions").insert({
-    user_id: user.id,
-    tx_type: "burn",
-    amount: creditsUsed.toString(),
-    xrpl_tx_hash: "",
-  });
-
-  // Log usage
-  await db.from("usage_logs").insert({
-    user_id: user.id,
-    api_key_id: apiKey.id,
-    model,
-    prompt_tokens,
-    completion_tokens,
-    credits_used: creditsUsed,
-    upstream_provider: "openai",
-  });
-
-  // Async XRPL burn (fire and forget for latency)
-  burnCredits(user.wallet_address, creditsUsed.toString()).catch(console.error);
-
-  return NextResponse.json(result);
 }

@@ -6,28 +6,28 @@ import { useWallet } from "@/providers/wallet-provider";
 interface UsageLog {
   id: string;
   model: string;
-  prompt_tokens: number;
-  completion_tokens: number;
+  prompt_sessionTokens: number;
+  completion_sessionTokens: number;
   credits_used: number;
   upstream_provider: string;
   created_at: string;
 }
 
 export default function UsagePage() {
-  const { token } = useWallet();
+  const { sessionToken } = useWallet();
   const [logs, setLogs] = useState<UsageLog[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!token) return;
-    fetch("/api/usage", { headers: { Authorization: `Bearer ${token}` } })
+    if (!sessionToken) return;
+    fetch("/api/usage", { headers: { Authorization: `Bearer ${sessionToken}` } })
       .then((r) => r.json())
       .then((d) => { setLogs(d.logs ?? []); setLoading(false); })
       .catch(() => setLoading(false));
-  }, [token]);
+  }, [sessionToken]);
 
   const totalCredits = logs.reduce((s, l) => s + l.credits_used, 0);
-  const totalTokens = logs.reduce((s, l) => s + l.prompt_tokens + l.completion_tokens, 0);
+  const totalTokens = logs.reduce((s, l) => s + l.prompt_sessionTokens + l.completion_sessionTokens, 0);
 
   return (
     <div className="max-w-5xl mx-auto px-6 py-10 space-y-8">
@@ -73,8 +73,8 @@ export default function UsagePage() {
                       {new Date(log.created_at).toLocaleString()}
                     </td>
                     <td className="py-2 pr-4 font-mono text-xs">{log.model}</td>
-                    <td className="py-2 pr-4">{log.prompt_tokens.toLocaleString()}</td>
-                    <td className="py-2 pr-4">{log.completion_tokens.toLocaleString()}</td>
+                    <td className="py-2 pr-4">{log.prompt_sessionTokens.toLocaleString()}</td>
+                    <td className="py-2 pr-4">{log.completion_sessionTokens.toLocaleString()}</td>
                     <td className="py-2 font-semibold text-indigo-400">{log.credits_used}</td>
                   </tr>
                 ))}

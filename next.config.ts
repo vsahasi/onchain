@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  turbopack: {},
+  serverExternalPackages: ["xrpl"],
 };
 
 export default nextConfig;

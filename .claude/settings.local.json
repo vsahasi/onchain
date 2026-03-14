@@ -5,7 +5,11 @@
       "Bash(npm run build 2>&1 | tail -50)",
       "Bash(npm run build 2>&1 | tail -402)",
       "Bash(node -e \"const sdk = require\\('@crossmarkio/sdk'\\); const m = sdk.default?.methods || sdk.methods; console.log\\(Object.getOwnPropertyNames\\(m\\).filter\\(k => k.includes\\('sign'\\) || k.includes\\('Sign'\\)\\)\\)\")",
-      "Bash(npm run build 2>&1 | tail -20)"
+      "Bash(npm run build 2>&1 | tail -20)",
+      "Bash(npx tsc --noEmit 2>&1 | head -60)",
+      "Bash(npx tsc --noEmit 2>&1 | head -40)",
+      "Bash(npm run build 2>&1 | tail -30)",
+      "Bash(npm install @crossmarkio/sdk 2>&1 | tail -5)"
     ]
   }
 }

@@ -1,51 +1,41 @@
-/**
- * Token Escrow (XLS-85) helpers.
- * Escrow is used for secure conditional settlement of credit deposits.
- *
- * XLS-85 extends XRPL escrow to issued currencies.
- * For the hackathon MVP we wrap the standard EscrowCreate/EscrowFinish flow.
- */
-import { getXRPLClient, getPlatformWallet, RLUSD_ISSUER, CREDIT_CURRENCY } from "./client";
+import { EscrowCreate, EscrowFinish } from "xrpl";
+import { getXrplClient, getPlatformWallet, getRlusdIssuer } from "./client";
 
 export async function createDepositEscrow(
-  fromAddress: string,
+  userAddress: string,
   rlusdAmount: string,
-  finishAfterSeconds: number = 60
-): Promise<{ escrowTx: object; finishAfter: number }> {
-  const finishAfter = Math.floor(Date.now() / 1000) + finishAfterSeconds;
+  cancelAfterSeconds: number = 3600
+): Promise<EscrowCreate> {
+  const platformWallet = getPlatformWallet();
 
-  // XLS-85 EscrowCreate for issued currency
-  const escrowTx = {
+  const cancelAfter = Math.floor(Date.now() / 1000) + cancelAfterSeconds + 946684800;
+
+  return {
     TransactionType: "EscrowCreate",
-    Account: fromAddress,
-    Amount: {
-      currency: "RLUSD",
-      issuer: RLUSD_ISSUER,
-      value: rlusdAmount,
-    },
-    Destination: getPlatformWallet().address,
-    FinishAfter: finishAfter,
+    Account: userAddress,
+    Destination: platformWallet.classicAddress,
+    Amount: rlusdAmount,
+    CancelAfter: cancelAfter,
   };
-
-  return { escrowTx, finishAfter };
 }
 
 export async function finishEscrow(
-  owner: string,
-  offerSequence: number
+  ownerAddress: string,
+  escrowSequence: number
 ): Promise<string> {
-  const client = await getXRPLClient();
-  const platform = getPlatformWallet();
+  const client = await getXrplClient();
+  const platformWallet = getPlatformWallet();
 
-  const tx = {
+  const escrowFinish: EscrowFinish = {
     TransactionType: "EscrowFinish",
-    Account: platform.address,
-    Owner: owner,
-    OfferSequence: offerSequence,
+    Account: platformWallet.classicAddress,
+    Owner: ownerAddress,
+    OfferSequence: escrowSequence,
   };
 
-  const prepared = await client.autofill(tx as any);
-  const signed = platform.sign(prepared as any);
+  const prepared = await client.autofill(escrowFinish);
+  const signed = platformWallet.sign(prepared);
   const result = await client.submitAndWait(signed.tx_blob);
-  return result.result.hash;
+
+  return typeof result.result.hash === "string" ? result.result.hash : "";
 }

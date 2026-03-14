@@ -1,84 +1,119 @@
 import { OfferCreate, OfferCancel } from "xrpl";
-import { getXRPLClient, getPlatformWallet, RLUSD_ISSUER, CREDIT_CURRENCY } from "./client";
+import {
+  getXrplClient,
+  getPlatformWallet,
+  getCreditCurrency,
+  getRlusdIssuer,
+  getRlusdCurrency,
+} from "./client";
 
-export interface OrderBookEntry {
-  account: string;
-  takerGets: { currency: string; issuer?: string; value: string } | string;
-  takerPays: { currency: string; issuer?: string; value: string } | string;
-  sequence: number;
-  quality: string;
+export interface BookOffer {
+  Account: string;
+  TakerGets: { currency: string; issuer: string; value: string } | string;
+  TakerPays: { currency: string; issuer: string; value: string } | string;
+  Sequence: number;
+  quality?: string;
 }
 
 export interface OrderBook {
-  asks: OrderBookEntry[];
-  bids: OrderBookEntry[];
+  asks: BookOffer[];
+  bids: BookOffer[];
 }
 
-/** Fetch INFX/RLUSD orderbook from XRPL native DEX */
 export async function getOrderBook(): Promise<OrderBook> {
-  const client = await getXRPLClient();
-  const platform = getPlatformWallet();
+  const client = await getXrplClient();
+  const platformWallet = getPlatformWallet();
+  const currency = getCreditCurrency();
+  const rlusdIssuer = getRlusdIssuer();
 
-  const infxCurrency = { currency: CREDIT_CURRENCY, issuer: platform.address };
-  const rlusdCurrency = { currency: "RLUSD", issuer: RLUSD_ISSUER };
+  const infxToken = {
+    currency,
+    issuer: platformWallet.classicAddress,
+  };
 
-  const [asksRes, bidsRes] = await Promise.all([
+  const rlusdToken = {
+    currency: getRlusdCurrency(),
+    issuer: rlusdIssuer,
+  };
+
+  const [asksResponse, bidsResponse] = await Promise.all([
     client.request({
       command: "book_offers",
-      taker_gets: infxCurrency,
-      taker_pays: rlusdCurrency,
-      limit: 20,
+      taker_gets: rlusdToken,
+      taker_pays: infxToken,
+      limit: 50,
     }),
     client.request({
       command: "book_offers",
-      taker_gets: rlusdCurrency,
-      taker_pays: infxCurrency,
-      limit: 20,
+      taker_gets: infxToken,
+      taker_pays: rlusdToken,
+      limit: 50,
     }),
   ]);
 
-  const mapOffer = (offer: any): OrderBookEntry => ({
-    account: offer.Account,
-    takerGets: offer.TakerGets,
-    takerPays: offer.TakerPays,
-    sequence: offer.Sequence,
-    quality: offer.quality ?? "0",
-  });
-
   return {
-    asks: asksRes.result.offers.map(mapOffer),
-    bids: bidsRes.result.offers.map(mapOffer),
+    asks: (asksResponse.result.offers || []) as unknown as BookOffer[],
+    bids: (bidsResponse.result.offers || []) as unknown as BookOffer[],
   };
 }
 
-/** Build an OfferCreate transaction (to be signed by the user's wallet) */
-export function buildOfferCreate(
-  account: string,
-  takerGetsINFX: string,
-  takerPaysRLUSD: string
+export function buildSellOffer(
+  userAddress: string,
+  infxAmount: string,
+  rlusdAmount: string
 ): OfferCreate {
-  const platform = getPlatformWallet();
+  const platformWallet = getPlatformWallet();
+  const currency = getCreditCurrency();
+  const rlusdIssuer = getRlusdIssuer();
+
   return {
     TransactionType: "OfferCreate",
-    Account: account,
+    Account: userAddress,
     TakerGets: {
-      currency: CREDIT_CURRENCY,
-      issuer: platform.address,
-      value: takerGetsINFX,
+      currency,
+      issuer: platformWallet.classicAddress,
+      value: infxAmount,
     },
     TakerPays: {
-      currency: "RLUSD",
-      issuer: RLUSD_ISSUER,
-      value: takerPaysRLUSD,
+      currency: getRlusdCurrency(),
+      issuer: rlusdIssuer,
+      value: rlusdAmount,
     },
   };
 }
 
-/** Build an OfferCancel transaction */
-export function buildOfferCancel(account: string, offerSequence: number): OfferCancel {
+export function buildBuyOffer(
+  userAddress: string,
+  infxAmount: string,
+  rlusdAmount: string
+): OfferCreate {
+  const platformWallet = getPlatformWallet();
+  const currency = getCreditCurrency();
+  const rlusdIssuer = getRlusdIssuer();
+
+  return {
+    TransactionType: "OfferCreate",
+    Account: userAddress,
+    TakerGets: {
+      currency: getRlusdCurrency(),
+      issuer: rlusdIssuer,
+      value: rlusdAmount,
+    },
+    TakerPays: {
+      currency,
+      issuer: platformWallet.classicAddress,
+      value: infxAmount,
+    },
+  };
+}
+
+export function buildCancelOffer(
+  userAddress: string,
+  offerSequence: number
+): OfferCancel {
   return {
     TransactionType: "OfferCancel",
-    Account: account,
+    Account: userAddress,
     OfferSequence: offerSequence,
   };
 }
