@@ -7,12 +7,13 @@ import { getXrplClient as getXRPLClient } from "@/lib/xrpl/client";
  * Used after the frontend gets a signed blob back from Crossmark.
  */
 export async function POST(req: NextRequest) {
-  const { txBlob } = await req.json();
-  if (!txBlob) return NextResponse.json({ error: "txBlob required" }, { status: 400 });
+  const { tx_blob, txBlob } = await req.json();
+  const blob = tx_blob ?? txBlob;
+  if (!blob) return NextResponse.json({ error: "tx_blob required" }, { status: 400 });
 
   try {
     const client = await getXRPLClient();
-    const result = await client.submitAndWait(txBlob);
+    const result = await client.submitAndWait(blob);
     const meta = result.result.meta as any;
     return NextResponse.json({
       hash: result.result.hash,
