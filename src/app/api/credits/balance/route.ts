@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCreditBalance } from "@/lib/xrpl/tokens";
+import { getEffectiveBalance } from "@/lib/xrpl/tokens";
 import { verifySessionToken } from "@/lib/auth";
 
 export async function GET(req: NextRequest) {
@@ -24,11 +24,13 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const balance = await getCreditBalance(walletAddress);
+    const balance = await getEffectiveBalance(walletAddress);
 
     return NextResponse.json({
       wallet_address: walletAddress,
-      infx_balance: balance.infx,
+      infx_balance: balance.effective_infx.toString(),
+      onchain_infx: balance.onchain_infx.toString(),
+      used_infx: balance.used_infx.toString(),
       rlusd_balance: balance.rlusd,
     });
   } catch (err) {

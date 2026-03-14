@@ -60,11 +60,14 @@ export function CreditBalance() {
             {loading ? (
               <span className="text-muted-foreground">...</span>
             ) : (
-              parseFloat(balance?.infx_balance || "0").toLocaleString()
+              parseFloat(balance?.infx_balance || "0").toLocaleString(undefined, {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })
             )}
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            ≈ ${(parseFloat(balance?.infx_balance || "0") / 100).toFixed(2)} USD
+            ≈ ${(parseFloat(balance?.infx_balance || "0") / 100).toFixed(4)} USD
           </p>
         </CardContent>
       </Card>

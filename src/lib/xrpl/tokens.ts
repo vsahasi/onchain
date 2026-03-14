@@ -1,4 +1,10 @@
-import { TrustSet, Payment } from "xrpl";
+import {
+  TrustSet,
+  Payment,
+  AccountSet,
+  AccountSetAsfFlags,
+  Clawback,
+} from "xrpl";
 import {
   getXrplClient,
   getPlatformWallet,
@@ -6,6 +12,7 @@ import {
   getRlusdIssuer,
   getRlusdCurrency,
 } from "./client";
+import { getSupabase } from "@/lib/db/supabase";
 
 export async function setupTrustLine(
   userAddress: string,
@@ -125,6 +132,59 @@ export async function getCreditBalance(
   return { infx: infxBalance, rlusd: rlusdBalance };
 }
 
+export interface EffectiveBalance {
+  onchain_infx: number;
+  used_infx: number;
+  effective_infx: number;
+  rlusd: string;
+}
+
+/**
+ * Returns the effective IFX balance by subtracting DB-tracked burns from the
+ * on-chain trust line balance. If userId is not provided, looks it up by wallet.
+ */
+export async function getEffectiveBalance(
+  walletAddress: string,
+  userId?: string
+): Promise<EffectiveBalance> {
+  const onchain = await getCreditBalance(walletAddress);
+  const onchainInfx = parseFloat(onchain.infx);
+
+  let resolvedUserId = userId;
+  if (!resolvedUserId) {
+    const db = getSupabase();
+    const { data: user } = await db
+      .from("users")
+      .select("id")
+      .eq("wallet_address", walletAddress)
+      .single();
+    resolvedUserId = user?.id;
+  }
+
+  let usedCredits = 0;
+  if (resolvedUserId) {
+    const db = getSupabase();
+    const { data: burns } = await db
+      .from("credit_transactions")
+      .select("amount")
+      .eq("user_id", resolvedUserId)
+      .eq("tx_type", "burn");
+
+    if (burns) {
+      usedCredits = burns.reduce((sum, row) => sum + parseFloat(row.amount || "0"), 0);
+    }
+  }
+
+  const effective = Math.max(0, onchainInfx - usedCredits);
+
+  return {
+    onchain_infx: onchainInfx,
+    used_infx: usedCredits,
+    effective_infx: Math.round(effective * 100) / 100,
+    rlusd: onchain.rlusd,
+  };
+}
+
 export async function getTrustLineExists(
   userAddress: string,
   currency: string,
@@ -144,4 +204,75 @@ export async function getTrustLineExists(
   } catch {
     return false;
   }
+}
+
+/**
+ * Claws back IFX tokens from a user's trust line. The platform wallet (issuer)
+ * must have asfAllowTrustLineClawback enabled via enableClawback().
+ */
+export async function clawbackCredits(
+  userAddress: string,
+  amount: string
+): Promise<string> {
+  const client = await getXrplClient();
+  const wallet = getPlatformWallet();
+  const currency = getCreditCurrency();
+
+  const clawback: Clawback = {
+    TransactionType: "Clawback",
+    Account: wallet.classicAddress,
+    Amount: {
+      currency,
+      issuer: userAddress,
+      value: amount,
+    },
+  };
+
+  const prepared = await client.autofill(clawback);
+  const signed = wallet.sign(prepared);
+  const result = await client.submitAndWait(signed.tx_blob);
+
+  const meta = result.result.meta;
+  if (
+    typeof meta === "object" &&
+    meta !== null &&
+    "TransactionResult" in meta &&
+    meta.TransactionResult !== "tesSUCCESS"
+  ) {
+    throw new Error(`Clawback failed: ${meta.TransactionResult}`);
+  }
+
+  return typeof result.result.hash === "string" ? result.result.hash : "";
+}
+
+/**
+ * One-time setup: enables the Clawback flag on the platform issuer account.
+ * Must be called before any trust lines are created, or on testnet where
+ * the amendment allows retroactive enablement.
+ */
+export async function enableClawback(): Promise<string> {
+  const client = await getXrplClient();
+  const wallet = getPlatformWallet();
+
+  const accountSet: AccountSet = {
+    TransactionType: "AccountSet",
+    Account: wallet.classicAddress,
+    SetFlag: AccountSetAsfFlags.asfAllowTrustLineClawback,
+  };
+
+  const prepared = await client.autofill(accountSet);
+  const signed = wallet.sign(prepared);
+  const result = await client.submitAndWait(signed.tx_blob);
+
+  const meta = result.result.meta;
+  if (
+    typeof meta === "object" &&
+    meta !== null &&
+    "TransactionResult" in meta &&
+    meta.TransactionResult !== "tesSUCCESS"
+  ) {
+    throw new Error(`Enable clawback failed: ${meta.TransactionResult}`);
+  }
+
+  return typeof result.result.hash === "string" ? result.result.hash : "";
 }

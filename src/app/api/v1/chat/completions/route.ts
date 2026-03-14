@@ -3,9 +3,7 @@ import { hashApiKey } from "@/lib/auth";
 import { getSupabase } from "@/lib/db/supabase";
 import { routeRequest } from "@/lib/gateway/router";
 import { calculateCreditCost } from "@/lib/gateway/metering";
-import { getCreditBalance, issueCredits } from "@/lib/xrpl/tokens";
-import { getPlatformWallet, getCreditCurrency } from "@/lib/xrpl/client";
-import { getXrplClient } from "@/lib/xrpl/client";
+import { getEffectiveBalance } from "@/lib/xrpl/tokens";
 import { v4 as uuidv4 } from "uuid";
 
 async function resolveUser(apiKey: string) {
@@ -70,16 +68,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const balance = await getCreditBalance(walletAddress);
-    const infxBalance = parseFloat(balance.infx);
+    const balance = await getEffectiveBalance(walletAddress, user.id);
 
-    if (infxBalance <= 0) {
+    if (balance.effective_infx <= 0) {
       return NextResponse.json(
         {
           error: {
             message: "Insufficient IFX credits. Deposit RLUSD or purchase credits on the marketplace.",
             type: "insufficient_credits",
-            balance: balance.infx,
+            balance: balance.effective_infx.toString(),
           },
         },
         { status: 402 }
@@ -96,34 +93,12 @@ export async function POST(req: NextRequest) {
 
     if (creditCost > 0) {
       try {
-        const client = await getXrplClient();
-        const platformWallet = getPlatformWallet();
-        const currency = getCreditCurrency();
-
-        const burnPayment = {
-          TransactionType: "Payment" as const,
-          Account: platformWallet.classicAddress,
-          Destination: platformWallet.classicAddress,
-          Amount: {
-            currency,
-            issuer: platformWallet.classicAddress,
-            value: creditCost.toString(),
-          },
-          SendMax: {
-            currency,
-            issuer: platformWallet.classicAddress,
-            value: creditCost.toString(),
-          },
-        };
-
-        // In production, this would be a clawback or authorized debit.
-        // For the MVP, we track the burn in our database and periodically settle.
         const db = getSupabase();
         await db.from("credit_transactions").insert({
           user_id: user.id,
           tx_type: "burn",
-          amount: creditCost,
-          xrpl_tx_hash: null,
+          amount: creditCost.toString(),
+          xrpl_tx_hash: "",
         });
 
         await db.from("usage_logs").insert({
@@ -136,8 +111,8 @@ export async function POST(req: NextRequest) {
           credits_used: creditCost,
           upstream_provider: result.upstreamProvider,
         });
-      } catch (burnErr) {
-        console.error("Credit burn logging error:", burnErr);
+      } catch (dbErr) {
+        console.error("Usage logging error:", dbErr);
       }
     }
 
