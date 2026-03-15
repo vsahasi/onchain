@@ -24,7 +24,7 @@ export function useWallet() {
   return ctx;
 }
 
-const STORAGE_KEY = "openchain_wallet";
+const STORAGE_KEY = "onchain_wallet";
 
 export function WalletProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<WalletState>({

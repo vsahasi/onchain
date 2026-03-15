@@ -1,10 +1,10 @@
-# openchain — Tokenized AI Inference Credits on XRPL
+# onchain — Tokenized AI Inference Credits on XRPL
 
 > Every month, people waste API credits. Providers bill monthly; you pay for more than you use. Unused credits expire—no refund, no transfer, no resale.
 
-**openchain** is a marketplace on the XRP Ledger where AI inference credits are tokenized and tradeable. Buy only what you need. Sell what you don't use. No monthly lock-in, no wasted spend—all payments settle on-chain.
+**onchain** is a marketplace on the XRP Ledger where AI inference credits are tokenized and tradeable. Buy only what you need. Sell what you don't use. No monthly lock-in, no wasted spend—all payments settle on-chain.
 
-**Live Demo:** [openchain-hznqscjk1-vsahasi-3315s-projects.vercel.app](https://openchain-hznqscjk1-vsahasi-3315s-projects.vercel.app)
+**Live Demo:** [onchain-seven.vercel.app](https://onchain-seven.vercel.app)
 
 ---
 
@@ -13,7 +13,7 @@
 1. **Deposit XRP** → receive IFX inference credits (1 XRP = 100 IFX)
 2. **Sell API access** → list your credit pool on the marketplace for a fixed RLUSD price
 3. **Buy a listing** → pay via Crossmark wallet, receive an API key instantly
-4. **Call AI models** → use any OpenAI SDK pointed at openchain — seller's credits debit per token
+4. **Call AI models** → use any OpenAI SDK pointed at onchain — seller's credits debit per token
 5. **All payments settle on XRPL Testnet** — fully verifiable, no custodian
 
 **Why blockchain?** Credits become assets you own. You can resell them. Buyers pay exactly for what they get. Every debit is transparent and auditable on-chain—no black-box billing.
@@ -92,7 +92,7 @@ Open **[http://localhost:3000](http://localhost:3000)**
 
 ## Using the API Gateway
 
-The gateway is a **drop-in replacement for the OpenAI SDK**. Any key issued or purchased on openchain works here.
+The gateway is a **drop-in replacement for the OpenAI SDK**. Any key issued or purchased on onchain works here.
 
 ```python
 from openai import OpenAI
@@ -104,7 +104,7 @@ client = OpenAI(
 
 response = client.chat.completions.create(
     model="gpt-4o-mini",
-    messages=[{"role": "user", "content": "Hello from openchain!"}]
+    messages=[{"role": "user", "content": "Hello from onchain!"}]
 )
 
 print(response.choices[0].message.content)

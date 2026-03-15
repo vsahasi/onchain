@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "openchain — Tokenized Inference Credits on XRPL",
+  title: "onchain — Tokenized Inference Credits on XRPL",
   description:
     "Marketplace for tokenized AI inference credits on the XRP Ledger. Deposit RLUSD, trade credits, and access LLMs at a discount.",
 };

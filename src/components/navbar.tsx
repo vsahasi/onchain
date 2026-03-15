@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useWallet } from "@/providers/wallet-provider";
 import { Button } from "@/components/ui/button";
+import { Logo } from "@/components/logo";
 
 const NAV = [
   { href: "/", label: "Dashboard" },
@@ -22,10 +23,10 @@ export function Navbar() {
           {/* Logo */}
           <div className="flex items-center gap-8">
             <Link href="/" className="flex items-center gap-2.5 group">
-              <div className="relative w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-[0_0_16px_rgba(99,102,241,0.5)] group-hover:shadow-[0_0_24px_rgba(99,102,241,0.7)] transition-shadow duration-300">
-                <span className="text-white font-bold text-xs tracking-tight">oc</span>
+              <div className="relative flex items-center justify-center shadow-[0_0_16px_rgba(99,102,241,0.5)] group-hover:shadow-[0_0_24px_rgba(99,102,241,0.7)] transition-shadow duration-300">
+                <Logo size={28} />
               </div>
-              <span className="font-semibold text-white text-sm">openchain</span>
+              <span className="font-semibold text-white text-sm">onchain</span>
             </Link>
 
             <nav className="hidden md:flex items-center gap-1">

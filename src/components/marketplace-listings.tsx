@@ -29,7 +29,7 @@ const DEMO_LISTINGS: Listing[] = [
   {
     id: "demo-1",
     title: "GPT-4o Pro Access",
-    description: "Full access to GPT-4o via the openchain gateway. Backed by 5,000 IFX credits.",
+    description: "Full access to GPT-4o via the onchain gateway. Backed by 5,000 IFX credits.",
     price_rlusd: "15.00",
     credit_limit: "5000",
     max_purchases: 0,

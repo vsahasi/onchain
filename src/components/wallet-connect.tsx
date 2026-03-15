@@ -2,6 +2,7 @@
 
 import { useWallet } from "@/providers/wallet-provider";
 import { Button } from "@/components/ui/button";
+import { Logo } from "@/components/logo";
 
 const FEATURES = [
   { icon: "⚡", label: "Inference Credits", desc: "IFX tokens on XRPL" },
@@ -17,16 +18,14 @@ export function WalletConnect() {
       <div className="w-full max-w-md animate-fade-in-up">
         {/* Logo mark */}
         <div className="flex justify-center mb-8">
-          <div className="relative">
-            <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-[0_0_60px_rgba(99,102,241,0.5)]">
-              <span className="text-white font-bold text-3xl tracking-tight">IX</span>
-            </div>
-            <div className="absolute -inset-1 rounded-3xl bg-gradient-to-br from-indigo-500/20 to-violet-600/20 blur-md animate-glow-pulse" />
+          <div className="relative shadow-[0_0_60px_rgba(99,102,241,0.5)]">
+            <Logo size={80} />
+            <div className="absolute -inset-2 opacity-30 blur-md animate-glow-pulse bg-indigo-500/40 rounded-lg" />
           </div>
         </div>
 
         <div className="text-center mb-10">
-          <h1 className="text-3xl font-bold text-white mb-3 tracking-tight">Welcome to openchain</h1>
+          <h1 className="text-3xl font-bold text-white mb-3 tracking-tight">Welcome to onchain</h1>
           <p className="text-white/40 text-sm leading-relaxed max-w-sm mx-auto">
             Tokenized AI inference credits on the XRP Ledger. Deploy, trade, and monetize LLM access on-chain.
           </p>

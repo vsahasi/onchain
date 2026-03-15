@@ -133,7 +133,7 @@ export default function DashboardPage() {
               <p className="text-xs text-white/40 mb-1.5 font-medium uppercase tracking-wider">Base URL</p>
               <div className="flex items-center gap-2">
                 <code className="flex-1 bg-black/30 border border-white/[0.06] px-3 py-2.5 rounded-xl text-xs font-mono text-white/70 truncate">
-                  {typeof window !== "undefined" ? `${window.location.origin}/api/v1` : "https://openchain.app/api/v1"}
+                  {typeof window !== "undefined" ? `${window.location.origin}/api/v1` : "https://onchain-seven.vercel.app/api/v1"}
                 </code>
                 <Button
                   variant="outline"
@@ -177,7 +177,7 @@ export default function DashboardPage() {
             <pre className="text-xs font-mono leading-relaxed">
               <span className="text-white/30">from </span><span className="text-indigo-300">openai</span><span className="text-white/30"> import </span><span className="text-white/70">OpenAI{"\n\n"}</span>
               <span className="text-white/50">client</span><span className="text-white/30"> = </span><span className="text-indigo-300">OpenAI</span><span className="text-white/70">({"\n"}</span>
-              <span className="text-white/70">{"    "}</span><span className="text-emerald-300/70">base_url</span><span className="text-white/30">=</span><span className="text-amber-300/70">&quot;https://openchain.app/api/v1&quot;</span><span className="text-white/70">,{"\n"}</span>
+              <span className="text-white/70">{"    "}</span><span className="text-emerald-300/70">base_url</span><span className="text-white/30">=</span><span className="text-amber-300/70">&quot;https://onchain-seven.vercel.app/api/v1&quot;</span><span className="text-white/70">,{"\n"}</span>
               <span className="text-white/70">{"    "}</span><span className="text-emerald-300/70">api_key</span><span className="text-white/30">=</span><span className="text-amber-300/70">&quot;your-infx-key&quot;{"\n"}</span>
               <span className="text-white/70">){"\n\n"}</span>
               <span className="text-white/50">resp</span><span className="text-white/30"> = </span><span className="text-white/50">client.chat.completions.</span><span className="text-indigo-300">create</span><span className="text-white/70">({"\n"}</span>
