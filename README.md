@@ -1,10 +1,10 @@
-# openchain — Tokenized AI Inference Credits on XRPL
+# onchain — Tokenized AI Inference Credits for API usage on XRPL
 
-> Every month, people waste API credits. Providers bill monthly; you pay for more than you use. Unused credits expire—no refund, no transfer, no resale.
+> Every month, people waste API credits. Providers bill monthly, and you pay for more than you use. Unused credits expire leaving you without a refund, transfer, or resale.
 
-**openchain** is a marketplace on the XRP Ledger where AI inference credits are tokenized and tradeable. Buy only what you need. Sell what you don't use. No monthly lock-in, no wasted spend—all payments settle on-chain.
+**openchain** is a marketplace on the XRP Ledger where AI inference credits are tokenized and tradeable. Buy only what you need. Sell what you don't use. It enables no monthly lock-in, and importantly, no wasted spend—all payments settle on-chain.
 
-**Live Demo:** [openchain-hznqscjk1-vsahasi-3315s-projects.vercel.app](https://openchain-hznqscjk1-vsahasi-3315s-projects.vercel.app)
+Hosted live: openchain-seven.vercel.app
 
 ---
 
