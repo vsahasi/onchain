@@ -23,9 +23,9 @@ export function Navbar() {
           <div className="flex items-center gap-8">
             <Link href="/" className="flex items-center gap-2.5 group">
               <div className="relative w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-[0_0_16px_rgba(99,102,241,0.5)] group-hover:shadow-[0_0_24px_rgba(99,102,241,0.7)] transition-shadow duration-300">
-                <span className="text-white font-bold text-xs tracking-tight">IX</span>
+                <span className="text-white font-bold text-xs tracking-tight">oc</span>
               </div>
-              <span className="font-semibold text-white text-sm">OpenChain</span>
+              <span className="font-semibold text-white text-sm">openchain</span>
             </Link>
 
             <nav className="hidden md:flex items-center gap-1">

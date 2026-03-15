@@ -26,7 +26,7 @@ export function WalletConnect() {
         </div>
 
         <div className="text-center mb-10">
-          <h1 className="text-3xl font-bold text-white mb-3 tracking-tight">Welcome to OpenChain</h1>
+          <h1 className="text-3xl font-bold text-white mb-3 tracking-tight">Welcome to openchain</h1>
           <p className="text-white/40 text-sm leading-relaxed max-w-sm mx-auto">
             Tokenized AI inference credits on the XRP Ledger. Deploy, trade, and monetize LLM access on-chain.
           </p>

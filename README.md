@@ -1,4 +1,4 @@
-# OpenChain — Tokenized AI Inference Credits on XRPL
+# openchain — Tokenized AI Inference Credits on XRPL
 
 > **XRPL Hackathon 2025** — An on-chain API key marketplace where sellers list AI access backed by IFX credit tokens, buyers pay RLUSD stablecoin on the XRP Ledger, and every usage is settled transparently on-chain.
 
@@ -9,7 +9,7 @@
 1. **Deposit XRP** → receive IFX inference credits (1 XRP = 100 IFX)
 2. **Sell API access** → list your credit pool on the marketplace for a fixed RLUSD price
 3. **Buy a listing** → pay via Crossmark wallet, receive an API key instantly
-4. **Call AI models** → use any OpenAI SDK pointed at OpenChain — seller's credits debit per token
+4. **Call AI models** → use any OpenAI SDK pointed at openchain — seller's credits debit per token
 5. **All payments settle on XRPL Testnet** — fully verifiable, no custodian
 
 ---
@@ -86,7 +86,7 @@ Open **[http://localhost:3000](http://localhost:3000)**
 
 ## Using the API Gateway
 
-The gateway is a **drop-in replacement for the OpenAI SDK**. Any key issued or purchased on OpenChain works here.
+The gateway is a **drop-in replacement for the OpenAI SDK**. Any key issued or purchased on openchain works here.
 
 ```python
 from openai import OpenAI
@@ -98,7 +98,7 @@ client = OpenAI(
 
 response = client.chat.completions.create(
     model="gpt-4o-mini",
-    messages=[{"role": "user", "content": "Hello from OpenChain!"}]
+    messages=[{"role": "user", "content": "Hello from openchain!"}]
 )
 
 print(response.choices[0].message.content)
