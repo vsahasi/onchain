@@ -4,7 +4,7 @@
 
 **onchain** is a marketplace on the XRP Ledger where AI inference credits are tokenized and tradeable. Buy only what you need. Sell what you don't use. No monthly lock-in, no wasted spend—all payments settle on-chain.
 
-**Live Demo:** [onchain-seven.vercel.app](https://onchain-seven.vercel.app)
+**Deployed Live:** onchain-vsahasi-3315s-projects.vercel.app
 
 ---
 
