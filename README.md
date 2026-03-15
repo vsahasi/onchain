@@ -1,18 +1,22 @@
 # openchain — Tokenized AI Inference Credits on XRPL
 
-> **XRPL Hackathon 2025** — An on-chain API key marketplace where sellers list AI access backed by IFX credit tokens, buyers pay RLUSD stablecoin on the XRP Ledger, and every usage is settled transparently on-chain.
+> Every month, people waste API credits. Providers bill monthly; you pay for more than you use. Unused credits expire—no refund, no transfer, no resale.
+
+**openchain** is a marketplace on the XRP Ledger where AI inference credits are tokenized and tradeable. Buy only what you need. Sell what you don't use. No monthly lock-in, no wasted spend—all payments settle on-chain.
 
 **Live Demo:** [openchain-hznqscjk1-vsahasi-3315s-projects.vercel.app](https://openchain-hznqscjk1-vsahasi-3315s-projects.vercel.app)
 
 ---
 
-## What It Does
+## How It Works
 
 1. **Deposit XRP** → receive IFX inference credits (1 XRP = 100 IFX)
 2. **Sell API access** → list your credit pool on the marketplace for a fixed RLUSD price
 3. **Buy a listing** → pay via Crossmark wallet, receive an API key instantly
 4. **Call AI models** → use any OpenAI SDK pointed at openchain — seller's credits debit per token
 5. **All payments settle on XRPL Testnet** — fully verifiable, no custodian
+
+**Why blockchain?** Credits become assets you own. You can resell them. Buyers pay exactly for what they get. Every debit is transparent and auditable on-chain—no black-box billing.
 
 ---
 
