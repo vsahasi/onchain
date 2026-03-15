@@ -2,7 +2,7 @@
 
 > Every month, people waste API credits. Providers bill monthly, and you pay for more than you use. Unused credits expire leaving you without a refund, transfer, or resale.
 
-**openchain** is a marketplace on the XRP Ledger where AI inference credits are tokenized and tradeable. Buy only what you need. Sell what you don't use. It enables no monthly lock-in, and importantly, no wasted spend—all payments settle on-chain.
+**onchain** is a marketplace on the XRP Ledger where AI inference credits are tokenized and tradeable. Buy only what you need. Sell what you don't use. It enables no monthly lock-in, and importantly, no wasted spend—all payments settle on-chain.
 
 Hosted live: openchain-seven.vercel.app
 
