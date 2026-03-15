@@ -2,40 +2,68 @@
 
 import { useWallet } from "@/providers/wallet-provider";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+
+const FEATURES = [
+  { icon: "⚡", label: "Inference Credits", desc: "IFX tokens on XRPL" },
+  { icon: "⇄", label: "API Marketplace", desc: "Buy & sell AI access" },
+  { icon: "🔗", label: "On-chain Payments", desc: "RLUSD & XRP settlement" },
+];
 
 export function WalletConnect() {
-  const { connected, connect, isConnecting, address } = useWallet();
-
-  if (connected) return null;
+  const { connect, isConnecting } = useWallet();
 
   return (
-    <div className="flex items-center justify-center min-h-[60vh]">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <div className="w-16 h-16 rounded-2xl bg-primary mx-auto mb-4 flex items-center justify-center">
-            <span className="text-primary-foreground font-bold text-2xl">IX</span>
+    <div className="mesh-bg flex items-center justify-center min-h-[80vh] -mt-8 pt-8">
+      <div className="w-full max-w-md animate-fade-in-up">
+        {/* Logo mark */}
+        <div className="flex justify-center mb-8">
+          <div className="relative">
+            <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-[0_0_60px_rgba(99,102,241,0.5)]">
+              <span className="text-white font-bold text-3xl tracking-tight">IX</span>
+            </div>
+            <div className="absolute -inset-1 rounded-3xl bg-gradient-to-br from-indigo-500/20 to-violet-600/20 blur-md animate-glow-pulse" />
           </div>
-          <CardTitle className="text-2xl">Welcome to InferX</CardTitle>
-          <CardDescription>
-            Tokenized inference credits on the XRP Ledger. Connect your wallet
-            to deposit RLUSD, trade credits, and access AI models at a discount.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+        </div>
+
+        <div className="text-center mb-10">
+          <h1 className="text-3xl font-bold text-white mb-3 tracking-tight">Welcome to OpenChain</h1>
+          <p className="text-white/40 text-sm leading-relaxed max-w-sm mx-auto">
+            Tokenized AI inference credits on the XRP Ledger. Deploy, trade, and monetize LLM access on-chain.
+          </p>
+        </div>
+
+        {/* Feature pills */}
+        <div className="grid grid-cols-3 gap-3 mb-10">
+          {FEATURES.map((f) => (
+            <div key={f.label} className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 text-center">
+              <div className="text-xl mb-1.5">{f.icon}</div>
+              <p className="text-xs font-medium text-white/70">{f.label}</p>
+              <p className="text-[10px] text-white/30 mt-0.5">{f.desc}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* CTA */}
+        <div className="space-y-3">
           <Button
-            className="w-full"
-            size="lg"
+            className="w-full h-12 bg-indigo-600 hover:bg-indigo-500 text-white border-0 text-sm font-semibold shadow-[0_0_30px_rgba(99,102,241,0.45)] hover:shadow-[0_0_40px_rgba(99,102,241,0.65)] transition-all duration-300"
             onClick={connect}
             disabled={isConnecting}
           >
-            {isConnecting ? "Connecting..." : "Connect XRPL Wallet"}
+            {isConnecting ? (
+              <span className="flex items-center gap-2">
+                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                Connecting…
+              </span>
+            ) : (
+              "Connect XRPL Wallet"
+            )}
           </Button>
-          <p className="text-xs text-center text-muted-foreground">
-            Supports Crossmark, GEM Wallet, or manual address entry for testing.
+          <p className="text-center text-[11px] text-white/20">
+            Supports Crossmark · Manual address entry available for testing
           </p>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

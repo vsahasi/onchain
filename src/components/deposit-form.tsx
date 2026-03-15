@@ -13,7 +13,7 @@ const RLUSD_ISSUER = process.env.NEXT_PUBLIC_RLUSD_ISSUER ?? "rQhWct2fv4Vc4KRjRg
 const RLUSD_HEX = "524C555344000000000000000000000000000000";
 const XRP_TO_DROPS = 1_000_000; // 1 XRP = 1,000,000 drops
 
-type Step = "input" | "signing" | "confirming" | "done" | "error";
+type Step = "input" | "trustline" | "signing" | "confirming" | "done" | "error";
 
 export function DepositForm() {
   const { address, sessionToken, connected } = useWallet();
@@ -45,26 +45,20 @@ export function DepositForm() {
         Amount: String(Math.floor(parseFloat(amount) * XRP_TO_DROPS)),
       };
 
-      // signAndWait signs only — we then submit via the XRPL client server-side
-      // This avoids the Crossmark scroll/UI issue with signAndSubmitAndWait
-      const result = await sdk.methods.signAndWait(tx as never);
-      console.log("[deposit] signAndWait result:", JSON.stringify(result));
-      const resultData = (result as never as { response: { data: { tx_blob?: string; txBlob?: string; tx?: { tx_blob?: string } } } })?.response?.data;
-      const txBlob = resultData?.tx_blob ?? resultData?.txBlob ?? resultData?.tx?.tx_blob;
-      if (!txBlob) throw new Error("Wallet did not return a signed transaction");
+      const result = await sdk.methods.signAndSubmitAndWait(tx as never);
+      const resultAny = result as never as Record<string, unknown>;
+      const respData = (resultAny?.response as Record<string, unknown>)?.data as Record<string, unknown>;
+      // Crossmark returns { resp: {...}, result: { tx_json: {...}, meta: {...} } }
+      const innerResult = respData?.result as Record<string, unknown>;
+      const txMeta = innerResult?.meta as Record<string, unknown>;
+      const txResultCode = txMeta?.TransactionResult as string;
+      const hash = (innerResult?.hash ?? (innerResult?.tx_json as Record<string, unknown>)?.hash) as string;
+      console.log("[deposit-form] txResultCode:", txResultCode, "hash:", hash);
 
-      // Submit via our backend which returns the tx hash
-      const submitRes = await fetch("/api/xrpl/submit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tx_blob: txBlob }),
-      });
-      const submitData = await submitRes.json();
-      if (!submitRes.ok || submitData.result !== "tesSUCCESS") {
-        throw new Error(submitData.error ?? "Transaction failed on ledger");
+      if (txResultCode && txResultCode !== "tesSUCCESS") {
+        throw new Error(`Transaction failed: ${txResultCode}`);
       }
-
-      const hash = submitData.hash;
+      if (!hash) throw new Error("No transaction hash returned");
       setTxHash(hash);
       setStep("confirming");
 
@@ -75,13 +69,55 @@ export function DepositForm() {
       });
 
       const resData = await res.json();
-      if (!res.ok) throw new Error(resData.error ?? "Deposit failed");
+      console.log("[deposit-form] response:", res.status, resData);
+      if (!res.ok) {
+        if (resData.error === "Trust line not established") {
+          setStep("trustline");
+          return;
+        }
+        throw new Error(resData.error ?? "Deposit failed");
+      }
 
       setCreditsIssued(resData.credits_issued?.toString() ?? creditAmount.toString());
       setStep("done");
       toast.success("Credits issued!");
     } catch (e: unknown) {
-      setErrorMsg((e as Error).message ?? "Deposit failed");
+      const msg = (e as Error).message ?? "Deposit failed";
+      if (msg.toLowerCase().includes("trust line")) {
+        setStep("trustline");
+        return;
+      }
+      setErrorMsg(msg);
+      setStep("error");
+    }
+  }
+
+  async function setupTrustLine() {
+    if (!address) return;
+    setStep("signing");
+    try {
+      const tx = {
+        TransactionType: "TrustSet",
+        Account: address,
+        LimitAmount: {
+          currency: "INFX",
+          issuer: platformAddress,
+          value: "1000000000",
+        },
+      };
+      const result = await sdk.methods.signAndSubmitAndWait(tx as never);
+      const resultAny = result as never as Record<string, unknown>;
+      const respData = (resultAny?.response as Record<string, unknown>)?.data as Record<string, unknown>;
+      const innerResult = respData?.result as Record<string, unknown>;
+      const txMeta = innerResult?.meta as Record<string, unknown>;
+      const txResultCode = txMeta?.TransactionResult as string;
+      if (txResultCode && txResultCode !== "tesSUCCESS") {
+        throw new Error(`Trust line setup failed: ${txResultCode}`);
+      }
+              toast.success("Trust line set up! Now deposit your XRP.");
+      setStep("input");
+    } catch (e: unknown) {
+      setErrorMsg((e as Error).message ?? "Trust line setup failed");
       setStep("error");
     }
   }
@@ -101,8 +137,8 @@ export function DepositForm() {
       <CardHeader>
         <CardTitle>Deposit XRP for Credits</CardTitle>
         <CardDescription>
-          Send XRP to the platform via Crossmark and receive IFX inference
-          credits at a 1:100 ratio (1 XRP = 100 IFX).
+          Send XRP to the platform via Crossmark and receive INFX inference
+          credits at a 1:100 ratio (1 XRP = 100 INFX).
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -123,7 +159,7 @@ export function DepositForm() {
                 <p className="text-sm text-muted-foreground">
                   You will receive{" "}
                   <span className="font-semibold text-foreground">
-                    {creditAmount.toLocaleString()} IFX
+                    {creditAmount.toLocaleString()} INFX
                   </span>{" "}
                   credits
                 </p>
@@ -131,6 +167,20 @@ export function DepositForm() {
             </div>
             <Button className="w-full" onClick={handleDeposit} disabled={!amount || parseFloat(amount) <= 0}>
               Deposit via Crossmark
+            </Button>
+          </div>
+        )}
+
+        {step === "trustline" && (
+          <div className="space-y-4">
+            <div className="rounded-lg bg-yellow-950 border border-yellow-800 p-4 space-y-2">
+              <p className="text-sm font-medium text-yellow-400">One-time setup required</p>
+              <p className="text-sm text-muted-foreground">
+                  Your wallet needs a trust line to receive INFX credits. This is a one-time Crossmark transaction.
+              </p>
+            </div>
+            <Button className="w-full" onClick={setupTrustLine}>
+              Set Up Trust Line via Crossmark
             </Button>
           </div>
         )}
@@ -160,7 +210,7 @@ export function DepositForm() {
             <div>
               <p className="font-medium">Deposit Successful!</p>
               <p className="text-sm text-muted-foreground">
-                {parseFloat(creditsIssued ?? "0").toLocaleString()} IFX credits have been added to your balance.
+                {parseFloat(creditsIssued ?? "0").toLocaleString()} INFX credits have been added to your balance.
               </p>
               {txHash && (
                 <a
@@ -182,6 +232,39 @@ export function DepositForm() {
             <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-4">
               <p className="text-sm font-medium text-destructive">Error</p>
               <p className="text-sm text-muted-foreground mt-1">{errorMsg}</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="manual-hash">Already sent XRP? Paste transaction hash:</Label>
+              <Input
+                id="manual-hash"
+                placeholder="Paste XRPL transaction hash"
+                className="font-mono text-xs"
+                onChange={(e) => setTxHash(e.target.value)}
+              />
+              <Button
+                className="w-full"
+                onClick={async () => {
+                  if (!txHash || !sessionToken) return;
+                  setStep("confirming");
+                  try {
+                    const res = await fetch("/api/credits/deposit", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json", Authorization: `Bearer ${sessionToken}` },
+                      body: JSON.stringify({ tx_hash: txHash }),
+                    });
+                    const resData = await res.json();
+                    if (!res.ok) throw new Error(resData.error ?? "Deposit failed");
+                    setCreditsIssued(resData.credits_issued?.toString() ?? creditAmount.toString());
+                    setStep("done");
+                    toast.success("Credits issued!");
+                  } catch (e: unknown) {
+                    setErrorMsg((e as Error).message ?? "Deposit failed");
+                    setStep("error");
+                  }
+                }}
+              >
+                Confirm with Hash
+              </Button>
             </div>
             <Button variant="outline" className="w-full" onClick={reset}>Try Again</Button>
           </div>

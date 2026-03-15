@@ -9,7 +9,12 @@
       "Bash(npx tsc --noEmit 2>&1 | head -60)",
       "Bash(npx tsc --noEmit 2>&1 | head -40)",
       "Bash(npm run build 2>&1 | tail -30)",
-      "Bash(npm install @crossmarkio/sdk 2>&1 | tail -5)"
+      "Bash(npm install @crossmarkio/sdk 2>&1 | tail -5)",
+      "Bash(git add src/app/api/credits/deposit/route.ts src/app/api/xrpl/submit/route.ts src/components/deposit-form.tsx && git commit -m \"$\\(cat <<'EOF'\nUpdate deposit flow: XRP native payment via Crossmark sign-and-submit\n\n- Deposit form now uses XRP \\(not RLUSD\\) — 1 XRP = 100 IFX credits\n- Crossmark signs tx, backend submits and verifies on-chain before issuing credits\n- Added idempotency check on tx_hash in deposit route\n- Deposit route verifies tx on ledger \\(type, destination, sender, amount\\)\n- submit route accepts both tx_blob and txBlob for compatibility\n\nCo-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git push 2>&1)",
+      "mcp__ide__getDiagnostics",
+      "Bash(npx tsc --noEmit 2>&1)",
+      "Bash(git add -A && git commit -m \"$\\(cat <<'EOF'\nRedesign marketplace UI, add hardcoded demo listings, update README\n\n- Marketplace: custom tab bar, stats strip, polished listing cards with\n  model tags, seller badges, hover glow, skeleton loading states\n- Hardcode 3 demo listings \\(GPT-4o Pro, gpt-4o-mini Bundle, gpt-4.1-nano\\)\n  that always render for demo; real API listings append below\n- Demo buy flow shows informational toast instead of triggering wallet\n- README: full judge-facing setup guide — clone, .env, DB schema, curl\n  examples, architecture diagram, XRPL features table\n\nCo-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>\nEOF\n\\)\" && git push)"
     ]
   }
 }

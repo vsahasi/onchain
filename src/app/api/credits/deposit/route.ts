@@ -48,34 +48,48 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "tx not found on ledger" }, { status: 404 });
     }
 
-    const meta = txResult.meta as Record<string, unknown>;
+    const meta = (txResult.meta ?? txResult.metaData) as Record<string, unknown>;
+    const txResultCode = (meta?.TransactionResult ?? txResult.engine_result) as string;
+    // XRPL tx command nests fields inside tx_json
+    const txJson = (txResult.tx_json ?? txResult) as Record<string, unknown>;
+    console.error("[deposit] txResult keys:", Object.keys(txResult));
+    console.error("[deposit] txJson keys:", Object.keys(txJson));
+    console.error("[deposit] DeliverMax:", txJson["DeliverMax"], "Amount:", txJson["Amount"]);
+    console.error("[deposit] txJson full:", JSON.stringify(txJson));
 
     if (
-      txResult.TransactionType !== "Payment" ||
-      txResult.Destination !== platformAddress ||
-      meta?.TransactionResult !== "tesSUCCESS"
+      txJson.TransactionType !== "Payment" ||
+      txJson.Destination !== platformAddress ||
+      (txResultCode && txResultCode !== "tesSUCCESS")
     ) {
       console.error("[deposit] validation failed:", {
-        type: txResult.TransactionType,
-        destination: txResult.Destination,
+        type: txJson.TransactionType,
+        destination: txJson.Destination,
         expected: platformAddress,
-        result: meta?.TransactionResult,
+        result: txResultCode,
       });
       return NextResponse.json({ error: "invalid or failed tx" }, { status: 400 });
     }
 
-    if (txResult.Account !== walletAddress) {
-      console.error("[deposit] sender mismatch:", { account: txResult.Account, wallet: walletAddress });
+    if (txJson.Account !== walletAddress) {
+      console.error("[deposit] sender mismatch:", { account: txJson.Account, wallet: walletAddress });
       return NextResponse.json({ error: "tx sender does not match session wallet" }, { status: 403 });
     }
 
-    // Amount is XRP drops (string) for native XRP payments
-    const amount = txResult.Amount;
-    if (typeof amount !== "string") {
-      return NextResponse.json({ error: "payment must be in XRP" }, { status: 400 });
-    }
+    const amount = txJson["DeliverMax"] ?? txJson["Amount"];
+    let xrpAmount: number;
 
-    const xrpAmount = parseInt(amount) / DROPS_PER_XRP;
+    if (typeof amount === "string") {
+      // Native XRP payment (drops)
+      xrpAmount = parseInt(amount) / DROPS_PER_XRP;
+    } else if (typeof amount === "object" && amount !== null) {
+      // Issued currency — log and reject
+      console.error("[deposit] got issued currency payment:", amount);
+      return NextResponse.json({ error: "payment must be in XRP (received issued currency)" }, { status: 400 });
+    } else {
+      console.error("[deposit] unexpected amount type:", typeof amount, amount);
+      return NextResponse.json({ error: "could not parse payment amount" }, { status: 400 });
+    }
     const creditAmount = Math.floor(xrpAmount * XRP_TO_CREDITS);
 
     if (creditAmount < 1) {

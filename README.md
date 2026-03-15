@@ -1,118 +1,72 @@
-# InferX — Tokenized Inference Credits on XRPL
+# OpenChain — Tokenized AI Inference Credits on XRPL
 
-A marketplace for tokenized AI inference credits built on the XRP Ledger. Users deposit RLUSD stablecoin to receive INFX credits, trade unused credits at a discount on XRPL's native DEX, and redeem them through an OpenAI-compatible API gateway.
+> **XRPL Hackathon 2025** — An on-chain API key marketplace where sellers list AI access backed by IFX credit tokens, buyers pay RLUSD stablecoin on the XRP Ledger, and every usage is settled transparently on-chain.
 
-## XRPL Features Used
+---
 
-- **RLUSD Stablecoin** — payment currency for credit purchases
-- **Issued Currencies + Trust Lines** — INFX inference credits as XRPL tokens
-- **Native DEX (OfferCreate)** — fully on-chain orderbook for credit marketplace
-- **Token Escrow (XLS-85)** — conditional settlement for deposits
+## What It Does
 
-## Architecture
+1. **Deposit XRP** → receive IFX inference credits (1 XRP = 100 IFX)
+2. **Sell API access** → list your credit pool on the marketplace for a fixed RLUSD price
+3. **Buy a listing** → pay via Crossmark wallet, receive an API key instantly
+4. **Call AI models** → use any OpenAI SDK pointed at OpenChain — seller's credits debit per token
+5. **All payments settle on XRPL Testnet** — fully verifiable, no custodian
 
-```
-┌─────────────────────────────────────────────────────────┐
-│  Frontend (Next.js)                                     │
-│  Dashboard │ Marketplace │ Deposit                      │
-└──────┬──────────────┬──────────────┬────────────────────┘
-       │              │              │
-┌──────▼──────────────▼──────────────▼────────────────────┐
-│  API Layer                                              │
-│  /api/auth  │ /api/credits/* │ /api/marketplace         │
-│  /api/v1/chat/completions (OpenAI-compatible)           │
-└──────┬──────────────┬──────────────┬────────────────────┘
-       │              │              │
-  ┌────▼────┐   ┌─────▼─────┐  ┌────▼────────┐
-  │Supabase │   │   XRPL    │  │  Upstream   │
-  │  (DB)   │   │  Testnet  │  │ LLM (OpenAI)│
-  └─────────┘   └───────────┘  └─────────────┘
-```
+---
 
-## How It Works
-
-1. **Connect** your XRPL wallet (Crossmark or manual address)
-2. **Deposit** RLUSD to the platform address → receive INFX credits (1 RLUSD = 100 INFX)
-3. **Trade** unused credits on the XRPL native DEX at a discount
-4. **Use** credits through the OpenAI-compatible API gateway
-5. Credits are **burned** after each API call based on token usage
-
-## Setup
+## Run Locally
 
 ### Prerequisites
 
-- Node.js 20+
-- An XRPL Testnet wallet (get one at [faucet.altnet.rippletest.net](https://faucet.altnet.rippletest.net))
-- A Supabase project
-- An OpenAI API key (for upstream LLM access)
+| Requirement | Notes |
+|---|---|
+| Node.js 20+ | |
+| [Crossmark](https://crossmark.io) browser extension | Switch to XRPL Testnet (Ripple) |
+| Supabase project | Free tier works fine |
+| OpenAI API key | Any tier |
 
-### 1. Install dependencies
+### 1. Clone and install
 
 ```bash
+git clone https://github.com/vsahasi/onchain.git
+cd onchain
 npm install
 ```
 
-### 2. Configure environment
+### 2. Environment variables
 
-Copy `.env.local` and fill in:
+Create a `.env.local` file in the project root:
 
-```
+```bash
+# XRPL
 XRPL_NETWORK=wss://s.altnet.rippletest.net:51233
+NEXT_PUBLIC_XRPL_NETWORK=wss://s.altnet.rippletest.net:51233
 XRPL_PLATFORM_SEED=<your testnet wallet seed>
+NEXT_PUBLIC_PLATFORM_ADDRESS=<rAddress matching the seed>
 RLUSD_ISSUER=rQhWct2fv4Vc4KRjRgMrxa8xPN9Zx9iLKV
-CREDIT_CURRENCY=INFX
-OPENAI_API_KEY=<your OpenAI key>
-NEXT_PUBLIC_SUPABASE_URL=<your Supabase URL>
-NEXT_PUBLIC_SUPABASE_ANON_KEY=<your Supabase anon key>
-SUPABASE_SERVICE_ROLE_KEY=<your Supabase service role key>
-JWT_SECRET=<random secret string>
-NEXT_PUBLIC_PLATFORM_ADDRESS=<your platform wallet rAddress>
+NEXT_PUBLIC_RLUSD_ISSUER=rQhWct2fv4Vc4KRjRgMrxa8xPN9Zx9iLKV
+CREDIT_CURRENCY=IFX
+
+# OpenAI (upstream LLM)
+OPENAI_API_KEY=sk-...
+
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
+SUPABASE_SERVICE_ROLE_KEY=eyJ...
+
+# Auth
+JWT_SECRET=<64-char random hex — run: openssl rand -hex 32>
 ```
+
+> **Get a free funded XRPL Testnet wallet:**
+> Visit [faucet.altnet.rippletest.net](https://faucet.altnet.rippletest.net) — it returns an `rAddress` and a secret seed. Use the seed as `XRPL_PLATFORM_SEED`.
 
 ### 3. Set up the database
 
-Run the migration SQL in your Supabase project (or it was already applied via MCP):
+In your Supabase project → **SQL Editor** → paste and run the full contents of [`supabase-schema.sql`](./supabase-schema.sql).
 
-```sql
-CREATE TABLE users (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  wallet_address TEXT UNIQUE NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-
-CREATE TABLE api_keys (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  key_hash TEXT NOT NULL,
-  key_prefix TEXT NOT NULL,
-  name TEXT,
-  is_active BOOLEAN DEFAULT true,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  last_used_at TIMESTAMPTZ
-);
-
-CREATE TABLE usage_logs (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  api_key_id UUID REFERENCES api_keys(id) ON DELETE SET NULL,
-  model TEXT NOT NULL,
-  prompt_tokens INTEGER NOT NULL,
-  completion_tokens INTEGER NOT NULL,
-  total_tokens INTEGER NOT NULL DEFAULT 0,
-  credits_used NUMERIC NOT NULL,
-  upstream_provider TEXT NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-
-CREATE TABLE credit_transactions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  tx_type TEXT NOT NULL CHECK (tx_type IN ('deposit', 'burn', 'purchase', 'sale')),
-  amount NUMERIC NOT NULL,
-  xrpl_tx_hash TEXT,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-```
+This creates tables for: `users`, `api_keys`, `usage_logs`, `credit_transactions`, `marketplace_listings`, `marketplace_purchases`.
 
 ### 4. Run the dev server
 
@@ -120,46 +74,120 @@ CREATE TABLE credit_transactions (
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open **[http://localhost:3000](http://localhost:3000)**
 
-## API Gateway Usage
+### 5. Connect a wallet
 
-The gateway is OpenAI SDK-compatible. Replace your base URL and API key:
+- Open Crossmark → Settings → switch network to **Testnet (Ripple)**
+- Click **Connect Wallet** in the app
+- If your wallet isn't funded, visit the faucet above
+
+---
+
+## Using the API Gateway
+
+The gateway is a **drop-in replacement for the OpenAI SDK**. Any key issued or purchased on OpenChain works here.
 
 ```python
 from openai import OpenAI
 
 client = OpenAI(
     base_url="http://localhost:3000/api/v1",
-    api_key="infx_your_api_key_here"
+    api_key="infx_your_key_here"
 )
 
 response = client.chat.completions.create(
     model="gpt-4o-mini",
-    messages=[{"role": "user", "content": "Hello!"}]
+    messages=[{"role": "user", "content": "Hello from OpenChain!"}]
 )
 
 print(response.choices[0].message.content)
 print(f"Credits used: {response.usage.credits_used}")
 ```
 
-### Available Models
+```bash
+# curl
+curl http://localhost:3000/api/v1/chat/completions \
+  -H "Authorization: Bearer infx_your_key_here" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"gpt-4o-mini","messages":[{"role":"user","content":"Hello!"}]}'
+```
 
-| Model | Prompt (per 1M tokens) | Completion (per 1M tokens) |
-|-------|----------------------|---------------------------|
-| gpt-4o | $0.25 | $1.00 |
-| gpt-4o-mini | $0.015 | $0.06 |
-| gpt-4.1 | $0.20 | $0.80 |
-| gpt-4.1-mini | $0.04 | $0.16 |
-| gpt-4.1-nano | $0.01 | $0.04 |
+### Available models
+
+| Model | Approx. IFX per request |
+|---|---|
+| `gpt-4o` | ~18 |
+| `gpt-4o-mini` | ~5 |
+| `gpt-4.1` | ~22 |
+| `gpt-4.1-mini` | ~8 |
+| `gpt-4.1-nano` | ~3 |
+
+---
+
+## Architecture
+
+```
+Browser (Next.js App Router)
+  ├── /            Dashboard — balances, API config, recent usage
+  ├── /marketplace Browse/buy listings, sell your own access, purchase history
+  └── /deposit     Send XRP → receive IFX credits
+
+API Routes
+  ├── /api/auth                     Crossmark wallet auth → JWT + API key
+  ├── /api/credits/balance          On-chain IFX + RLUSD balance lookup
+  ├── /api/credits/deposit          Verify XRP tx on ledger → issue IFX credits
+  ├── /api/marketplace/listings     CRUD for marketplace listings
+  ├── /api/marketplace/purchase     Verify RLUSD payment → issue buyer API key
+  ├── /api/xrpl/prepare             Server-side tx autofill (Sequence, Fee, LLS)
+  ├── /api/xrpl/submit              Submit signed tx_blob, return hash + result
+  └── /api/v1/chat/completions      OpenAI-compatible gateway — debits seller credits
+
+Infrastructure
+  ├── Supabase (Postgres)   users, keys, usage, transactions, listings, purchases
+  ├── XRPL Testnet          IFX issued currency, XRP/RLUSD payments, on-chain verify
+  └── OpenAI                upstream LLM (model-routed, swappable)
+```
+
+### Marketplace purchase flow
+
+```
+1. Buyer clicks "Buy for X RLUSD"
+2. Crossmark signs & submits a Payment tx (RLUSD → platform address)
+3. POST /api/marketplace/purchase with { listing_id, tx_hash }
+4. Server calls XRPL `tx` RPC — verifies type, destination, sender, amount, tesSUCCESS
+5. New api_key row created with source_user_id = seller
+6. Raw key returned once to buyer (never stored plaintext)
+7. Buyer uses key as Bearer token on /api/v1/chat/completions
+8. Gateway debits SELLER's IFX balance per token usage
+```
+
+---
+
+## XRPL Features Used
+
+| Feature | Usage |
+|---|---|
+| Issued Currency (IFX tokens) | Platform issues IFX via trust lines as inference credits |
+| RLUSD Stablecoin | Marketplace purchase payments |
+| Payment transactions | XRP deposits + RLUSD marketplace buys |
+| `account_lines` RPC | Read IFX + RLUSD balances |
+| `tx` RPC | On-chain payment verification before issuing keys |
+| Crossmark SDK | Browser wallet signing — zero private keys in frontend |
+
+---
 
 ## Tech Stack
 
-- **Next.js 16** (App Router) — frontend + API routes
-- **Tailwind CSS + shadcn/ui** — UI components
-- **xrpl.js** — XRPL blockchain interaction
-- **Supabase** — PostgreSQL database
+- **Next.js 16** (App Router, Turbopack)
+- **Tailwind CSS v4 + shadcn/ui**
+- **xrpl.js** — XRPL node interaction
+- **@crossmarkio/sdk** — browser wallet
+- **Supabase** — Postgres
+- **jose** — JWT (edge-compatible)
 - **OpenAI SDK** — upstream LLM routing
+
+---
 
 ## License
 
