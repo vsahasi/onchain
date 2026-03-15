@@ -2,6 +2,8 @@
 
 > **XRPL Hackathon 2025** — An on-chain API key marketplace where sellers list AI access backed by IFX credit tokens, buyers pay RLUSD stablecoin on the XRP Ledger, and every usage is settled transparently on-chain.
 
+**Live Demo:** [openchain-hznqscjk1-vsahasi-3315s-projects.vercel.app](https://openchain-hznqscjk1-vsahasi-3315s-projects.vercel.app)
+
 ---
 
 ## What It Does

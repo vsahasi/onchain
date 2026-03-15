@@ -1,8 +1,14 @@
 import OpenAI from "openai";
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+let _openai: OpenAI | null = null;
+function getOpenAI(): OpenAI {
+  if (!_openai) {
+    const key = process.env.OPENAI_API_KEY;
+    if (!key) throw new Error("Missing OPENAI_API_KEY");
+    _openai = new OpenAI({ apiKey: key });
+  }
+  return _openai;
+}
 
 const MODEL_MAP: Record<string, string> = {
   "gpt-4o": "gpt-4o",
@@ -20,7 +26,7 @@ export async function routeRequest(
 ) {
   const upstreamModel = MODEL_MAP[model] || "gpt-4o-mini";
 
-  const response = await openai.chat.completions.create({
+  const response = await getOpenAI().chat.completions.create({
     model: upstreamModel,
     messages: messages as OpenAI.ChatCompletionMessageParam[],
     temperature: temperature ?? 0.7,
