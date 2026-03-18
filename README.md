@@ -1,6 +1,6 @@
 # onchain — Tokenized AI Inference Credits on XRPL
 
-**DEPLOYED LIVE:** onchain-vsahasi-3315s-projects.vercel.app
+**DEPLOYED LIVE:** https://onchain-vsahasi-3315s-projects.vercel.app/
 
 > Every month, people waste API credits. Providers bill monthly, and you pay for more than you use. Unused credits expire—no refund, no transfer, no resale.
 
